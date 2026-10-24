@@ -1,0 +1,22 @@
+{
+  "name": "le-commercant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Le Commerçant: a French shopkeeper defends his glass storefront from masked rioters.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "bs58": "5.0.0",
+    "express": "4.21.2",
+    "pg": "8.13.1",
+    "tweetnacl": "1.0.3",
+    "ws": "8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

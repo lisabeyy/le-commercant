@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>LE COMMERÇANT — defend your shop</title>
+<meta name="description" content="You are the shopkeeper. A sunlit Haussmannian street in Paris, and rioters pouring in from both ends of the boulevard to smash your shop window. Punch, kick, hold out as long as you can. It only ends when the glass gives way, the shop catches fire and the shopkeeper cries.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700;900&family=JetBrains+Mono:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="/css/site.css">
+<style>
+:root{ --good:#2fbf6b; --bad:#e5422f; --gold:#f6c24b; }
+html,body{height:100%;overscroll-behavior:none}
+body{overflow:hidden}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+.ui{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;gap:10px;
+  padding-block:12px;padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px));pointer-events:none}
+.ui>*{pointer-events:auto}
+
+/* HUD */
+.hud{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:16px;padding:10px 16px}
+.shop{display:grid;gap:5px;min-width:0}
+.shop .nm{font-family:var(--display);font-weight:900;font-size:20px;letter-spacing:.03em;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shop .nm small{font-family:var(--mono);font-size:10px;font-weight:800;padding:2px 6px;border-radius:3px;letter-spacing:.1em;background:rgba(246,194,75,.16);color:var(--gold)}
+.integ{height:14px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden;position:relative}
+.integ i{position:absolute;top:0;bottom:0;left:0;width:100%;background:linear-gradient(90deg,#12833f,var(--good));transition:width .18s ease-out}
+.integ i.low{background:linear-gradient(90deg,#b3790f,var(--gold))}
+.integ i.crit{background:linear-gradient(270deg,#7a0f0a,var(--bad))}
+.integn{font-size:11px;color:var(--mute);letter-spacing:.08em}
+.center{text-align:center;min-width:160px}
+#wave{font-size:11px;letter-spacing:.16em;color:var(--gold);font-weight:800}
+#score{font-family:var(--display);font-weight:900;font-size:44px;line-height:.95;letter-spacing:.02em}
+#time{font-size:11px;letter-spacing:.14em;color:var(--mute)}
+#time b{color:var(--fg);font-weight:800}
+.stats{text-align:right;display:grid;justify-items:end;gap:4px}
+.stats .big{font-family:var(--display);font-weight:900;font-size:22px;line-height:1}
+.stats .big span{font-size:11px;color:var(--mute)}
+#muteBtn{font-size:16px;padding:6px 10px}
+
+/* stage */
+.stagegap{flex:1;display:flex;align-items:flex-end;justify-content:space-between;position:relative;pointer-events:none;gap:12px;min-height:0}
+.stagegap>*{pointer-events:auto}
+.cams{align-self:flex-end;display:flex;flex-direction:column;gap:3px;padding:6px}
+.cams .lbl{font-size:10px;letter-spacing:.12em;color:var(--mute);padding:0 4px}
+.cams button{padding:4px 10px;font-size:11px;white-space:nowrap;border-color:transparent;background:transparent;width:100%;text-align:left}
+.cams button.on{background:var(--gold);color:#120d02;border-color:var(--gold)}
+#banner{position:absolute;top:8%;left:0;right:0;text-align:center;font-family:var(--display);font-weight:900;
+  font-size:clamp(34px,6vw,74px);letter-spacing:.05em;color:var(--gold);opacity:0;pointer-events:none;text-shadow:0 4px 26px rgba(0,0,0,.55);transition:opacity .3s,transform .3s;transform:scale(1.25)}
+#banner.show{opacity:1;transform:scale(1)}
+@media (prefers-reduced-motion:reduce){ #banner{transition:none} }
+
+/* controls */
+.controls{font-size:11px;color:var(--mute);line-height:1.5;max-width:280px}
+.controls kbd{font-family:var(--mono);font-size:10px;background:rgba(255,255,255,.1);border:1px solid var(--line);border-radius:3px;padding:1px 5px;color:var(--fg)}
+.pad{display:none}
+/* touch controls */
+#touch{display:none}
+.stick{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));
+  width:min(28vw,138px);height:min(28vw,138px);border-radius:50%;z-index:6;pointer-events:auto;touch-action:none;
+  background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.10),rgba(8,12,18,.30) 58%,rgba(8,12,18,.16));
+  border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  opacity:.72;transition:opacity .18s}
+.stick.active{opacity:1}
+.stick-ring{position:absolute;inset:22%;border-radius:50%;border:1px solid rgba(255,255,255,.16)}
+.stick-knob{position:absolute;left:50%;top:50%;width:42%;height:42%;border-radius:50%;transform:translate(-50%,-50%);
+  background:radial-gradient(circle at 40% 35%,rgba(255,255,255,.55),rgba(220,228,240,.22) 60%,rgba(255,255,255,.08));
+  border:1px solid rgba(255,255,255,.45);box-shadow:0 4px 16px rgba(0,0,0,.35);pointer-events:none}
+.stick::before,.stick::after{content:"";position:absolute;left:50%;top:50%;background:rgba(255,255,255,.16);transform:translate(-50%,-50%)}
+.stick::before{width:58%;height:1px}
+.stick::after{height:58%;width:1px}
+
+.acts{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));
+  z-index:6;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none}
+.actrow{display:flex;align-items:flex-end;gap:min(3.5vw,16px);pointer-events:none}
+.zoomers{display:flex;gap:8px;pointer-events:none}
+.zoom{pointer-events:auto;touch-action:none;width:40px;height:34px;padding:0;border-radius:999px;display:grid;place-items:center;
+  font-family:var(--display);font-weight:900;font-size:19px;line-height:1;color:#fff;
+  background:rgba(9,12,19,.52);border:1px solid rgba(255,255,255,.30);opacity:.72;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:background .15s,opacity .15s}
+.zoom:active{opacity:1;background:rgba(9,12,19,.85)}
+.zoom.on{opacity:1;border-color:var(--gold);color:var(--gold)}
+.act{pointer-events:auto;touch-action:none;padding:0;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--display);font-weight:900;letter-spacing:.08em;color:#fff;
+  width:min(17vw,80px);height:min(17vw,80px);font-size:min(3.4vw,14px);
+  border:1.5px solid rgba(255,255,255,.40);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .1s,background .1s,opacity .18s;opacity:.78}
+.act.punch{background:rgba(229,66,47,.46)}
+.act.kick{background:rgba(246,194,75,.46);width:min(14.5vw,68px);height:min(14.5vw,68px);margin-bottom:min(5vw,26px);font-size:min(3vw,12px)}
+.act.punch:active,.act.punch.on,.act.kick:active,.act.kick.on{transform:scale(.93);opacity:1}
+.act.punch:active,.act.punch.on{background:rgba(229,66,47,.82)}
+.act.kick:active,.act.kick.on{background:rgba(246,194,75,.86);color:#120d02}
+
+/* side panel */
+#panelToggle{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:14px;z-index:5}
+#panel{position:fixed;top:0;right:0;bottom:0;width:min(360px,92vw);z-index:25;transform:translateX(102%);
+  transition:transform .28s ease;display:flex;flex-direction:column;border-radius:0;border-right:0;padding:0}
+#panel.open{transform:none}
+.phead{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.tabs{display:flex;gap:4px;flex:1}
+.tabs button{padding:5px 12px;font-size:12px;border-color:transparent;background:transparent}
+.tabs button.on{background:var(--gold);color:#120d02;border-color:var(--gold)}
+#chatLog{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:12px}
+#chatLog[hidden]{display:none}
+#chatLog .msg{line-height:1.35;word-break:break-word}
+#chatLog .msg b{color:var(--gold)}
+#chatLog .msg.sys{color:var(--mute);font-style:italic}
+#board{flex:1;overflow-y:auto;padding:10px 12px;font-size:12px}
+.brow{display:grid;grid-template-columns:26px 1fr auto;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.brow.head{color:var(--mute);font-size:10px;letter-spacing:.1em;border-bottom-color:var(--line)}
+.brow.me{color:var(--gold);font-weight:800}
+.brow .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#chatForm{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--line)}
+#chatForm[hidden]{display:none}
+#chatForm input{flex:1}
+.empty{color:var(--mute)}
+
+/* overlays */
+.overlay{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:18px;overflow-y:auto;
+  background:radial-gradient(120% 90% at 50% 40%,rgba(4,8,14,.55),rgba(4,8,14,.88))}
+.overlay[hidden]{display:none}
+.card{max-width:560px;width:100%;padding:24px;text-align:center}
+.card h1{font-family:var(--display);font-weight:900;font-size:clamp(36px,8vw,72px);line-height:.92;margin:0 0 6px;letter-spacing:.02em}
+.card h2{font-family:var(--display);font-weight:900;font-size:clamp(30px,6vw,54px);line-height:.95;margin:0 0 10px}
+.card h2.bad{color:var(--bad)}
+.card p{margin:6px 0;color:var(--mute)}
+.card .big{font-family:var(--display);font-weight:900;font-size:clamp(30px,7vw,58px);line-height:1;color:var(--gold);margin:8px 0}
+.cta{font-family:var(--display);font-weight:900;font-size:20px;letter-spacing:.04em;padding:14px 34px;border:0;background:var(--gold);color:#120d02;border-radius:4px;margin-top:14px}
+.cta:hover{filter:brightness(1.08)}
+.cta.ghost{background:transparent;border:1px solid var(--gold);color:var(--gold)}
+.overBtns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;text-align:left;margin:16px auto 4px;max-width:340px;font-size:12px;color:var(--mute)}
+.keys b{color:var(--fg);font-weight:700}
+#nameInput{max-width:220px;margin:6px auto}
+.flags{font-size:12px;color:var(--mute)}
+.only-touch{display:none}
+.touch-only{display:none}
+#gas{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:0;transition:opacity .6s;
+  background:radial-gradient(ellipse at 50% 62%, rgba(190,205,140,0) 30%, rgba(164,184,110,.34) 100%)}
+#gas.on{opacity:1;animation:gasPulse 2.6s ease-in-out infinite}
+#gas span{position:absolute;left:50%;bottom:16%;transform:translateX(-50%);font:800 10px/1 var(--mono);
+  letter-spacing:.22em;color:#e9f2c6;opacity:.8;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+@keyframes gasPulse{0%,100%{opacity:.75}50%{opacity:1}}
+#toast{position:fixed;left:50%;top:176px;transform:translateX(-50%);z-index:30;padding:13px 26px;
+  background:rgba(48,8,8,.95);border:1px solid rgba(255,110,100,.55);border-radius:5px;
+  color:#ffd7d2;font-weight:700;font-size:15px;letter-spacing:.01em;line-height:1.35;
+  pointer-events:none;max-width:min(620px,90vw);text-align:center;box-shadow:0 12px 36px rgba(0,0,0,.5)}
+
+@media (max-height:600px){
+  .overlay .card{padding:16px}
+  .card .keys{margin:8px auto 2px}
+  .cta{padding:10px 26px;margin-top:8px}
+}
+@media (max-width:860px){
+  .shop .nm{font-size:14px}
+  #score{font-size:28px}
+  .stats .big{font-size:16px}
+  .cams{display:none}
+}
+/* small / touch screens: slim bars, one-row HUD, both orientations */
+@media (hover:none),(pointer:coarse){
+  .controls{display:none}
+  #touch{display:block}
+  .only-touch{display:block}
+  .touch-only{display:inline-block}
+  #panelToggle{display:none}
+  input{font-size:16px}
+  #toast{top:52%;bottom:auto;transform:translate(-50%,-50%);padding:8px 14px;text-align:center;
+    font-size:12px;max-width:92vw;box-shadow:none}
+  .glass{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(9,12,19,.88)}
+  .act,.stick{backdrop-filter:none;-webkit-backdrop-filter:none}
+
+  .ui{padding-block:6px;gap:6px}
+  .topnav{gap:6px;padding:3px 8px}
+  .topnav .brand b{font-size:15px}
+  .topnav .brand span{display:none}
+  .topnav .menu-btn{padding:4px 8px}
+
+  .hud{grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:5px 8px}
+  .shop{gap:3px}
+  .shop .nm{font-size:11px}
+  .shop .nm small{display:none}
+  .integ{height:8px}
+  .integn{font-size:9px;letter-spacing:.06em}
+  .center{min-width:0;text-align:right}
+  #wave{font-size:9px;letter-spacing:.1em}
+  #score{font-size:22px}
+  #time{display:none}
+  .stats{display:flex;align-items:center;justify-content:flex-end;gap:5px}
+  .stats>.lbl,.stats>.big{display:none}
+  #muteBtn,#panelBtn{height:32px;padding:0 9px;font-size:12px}
+  .cams{display:none}
+  .card .keys{display:none}
+  .card p{font-size:12px;line-height:1.55}
+}
+</style>
+</head>
+<body data-page="arena">
+<canvas id="scene" aria-label="Sunlit Haussmannian street in Paris, shop window under siege"></canvas>
+<div id="gas" aria-hidden="true"><span>TEAR GAS</span></div>
+<div id="toast" role="alert" hidden></div>
+
+<div class="ui">
+  <header id="topnav"></header>
+
+  <section class="hud glass" aria-label="Riot status">
+    <div class="shop">
+      <div class="nm" id="shopName">ÉPICERIE DU COIN <small>PARIS</small></div>
+      <div class="integ"><i id="glassBar"></i></div>
+      <div class="integn num" id="glassN">WINDOW · 100%</div>
+    </div>
+    <div class="center">
+      <div id="wave">WAVE 1</div>
+      <div id="score" class="num">0</div>
+      <div id="time" class="num">time <b>0.0</b>s</div>
+    </div>
+    <div class="stats">
+      <span class="lbl">Rioters down</span>
+      <div class="big num" id="kos">0</div>
+      <span class="lbl"><span id="rioters">0</span> in the street · <span id="watch">offline</span></span>
+      <button id="muteBtn" class="glass" type="button" title="Sound (M)">🔊</button>
+      <button id="panelBtn" class="glass touch-only" type="button">Chat</button>
+    </div>
+  </section>
+
+  <div class="stagegap">
+    <div id="banner" aria-live="polite"></div>
+    <div class="controls glass">
+      <div><kbd>A</kbd><kbd>D</kbd> strafe · <kbd>W</kbd><kbd>S</kbd> push forward / pull back</div>
+      <div><kbd>J</kbd> or click = punch · <kbd>K</kbd> or right-click = kick</div>
+      <div><kbd>M</kbd> sound · <kbd>C</kbd> chat · <kbd>Enter</kbd> restart</div>
+    </div>
+    <div class="cams glass" role="group" aria-label="Camera">
+      <span class="lbl">Camera</span>
+      <button type="button" data-cam="street" class="on">Street</button>
+      <button type="button" data-cam="close">Close</button>
+      <button type="button" data-cam="cine">Cine</button>
+      <button type="button" data-cam="wide">Wide</button>
+      <button type="button" data-cam="free">Free</button>
+    </div>
+  </div>
+</div>
+
+<div id="touch" aria-label="Touch controls">
+  <div id="stick" class="stick" role="application" aria-label="Move">
+    <div class="stick-ring"></div>
+    <div class="stick-knob" id="stickKnob"></div>
+  </div>
+  <div class="acts">
+    <div class="zoomers">
+      <button id="zoomOut" class="zoom" type="button" aria-label="Zoom out">−</button>
+      <button id="zoomIn" class="zoom on" type="button" aria-label="Zoom in">+</button>
+    </div>
+    <div class="actrow">
+      <button class="act kick" data-k="kick" type="button">KICK</button>
+      <button class="act punch" data-k="punch" type="button">PUNCH</button>
+    </div>
+  </div>
+</div>
+
+<button id="panelToggle" class="glass" type="button">Chat &amp; leaderboard</button>
+<aside id="panel" class="glass">
+  <div class="phead">
+    <div class="tabs">
+      <button type="button" data-tab="chat" class="on">Chat</button>
+      <button type="button" data-tab="board">Leaderboard</button>
+    </div>
+    <button id="panelClose" type="button">✕</button>
+  </div>
+  <div id="chatLog"></div>
+  <div id="board" hidden></div>
+  <form id="chatForm"><input id="chatInput" maxlength="140" placeholder="Say it to the street…" autocomplete="off"><button type="submit">Send</button></form>
+</aside>
+
+<div id="startOverlay" class="overlay">
+  <div class="card glass">
+    <h1>LE COMMERÇANT</h1>
+    <p class="flags">🇫🇷 A Haussmannian street. One shop window. The whole street against you.</p>
+    <p>You are the shopkeeper. Rioters pour in from both ends of the boulevard, more of them every wave. Punch and kick — <b>it only ends when the glass gives way, the shop catches fire and you are left crying</b>. Hold out as long as you can for the best score.</p>
+    <div class="keys">
+      <b>A / D · ← →</b><span>move along the shop window</span>
+      <b>W / S · ↑ ↓</b><span>push into the street / pull back</span>
+      <b>J or left-click</b><span>punch</span>
+      <b>K or right-click</b><span>kick (harder)</span>
+      <b>M · C · Enter</b><span>sound · chat · restart</span>
+    </div>
+    <p class="flags only-touch">On a phone: joystick on the left, PUNCH / KICK on the right. Play in any orientation.</p>
+    <input id="nameInput" maxlength="16" placeholder="Your name" autocomplete="off">
+    <button id="startBtn" class="cta" type="button">OPEN THE SHOP</button>
+  </div>
+</div>
+
+<div id="overOverlay" class="overlay" hidden>
+  <div class="card glass">
+    <h2 class="bad">THE SHOP WINDOW GAVE WAY</h2>
+    <p id="overSub">The street won this time.</p>
+    <div class="big num" id="overScore">0</div>
+    <p><span id="overKos">0</span> rioters down · <span id="overTime">0s</span> held out</p>
+    <p id="rankLine" class="flags"></p>
+    <div class="overBtns">
+      <button id="againBtn" class="cta" type="button">OPEN THE SHOP AGAIN</button>
+      <button id="boardBtn" class="cta ghost" type="button">VIEW LEADERBOARD</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="/js/engine.js"></script>
+<script src="/js/audio.js"></script>
+<script src="/js/nav.js"></script>
+<script src="/js/arena.js"></script>
+</body>
+</html>
